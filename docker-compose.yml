@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aninha_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: aninha_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aninha_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aninha_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/aninha_db
+      JWT_SECRET: your_jwt_secret_key_here
+      NODE_ENV: development
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    networks:
+      - aninha_network
+    command: npm run dev
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: aninha_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - aninha_network
+
+volumes:
+  postgres_data:
+
+networks:
+  aninha_network:
+    driver: bridge
